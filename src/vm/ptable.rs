@@ -102,7 +102,7 @@ impl PageTable {
     }
     pub fn write_satp(&self) {
         flush_tlb();
-        write_satp(phy_to_satp(self.base));
+        set_satp(phy_to_satp(self.base));
         flush_tlb();
     }
 }

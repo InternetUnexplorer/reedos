@@ -36,18 +36,19 @@ pub const UART_BASE: usize = 0x10000000;
 /// Start of kernel memory (first .text section goes here).
 pub const DRAM_BASE: *mut usize = 0x80000000 as *mut usize;
 
-
 macro_rules! linker_var {
     (
         $linker_name: ident,
         $rust_name: ident
     ) => {
-        extern "C" { static mut $linker_name: usize; }
-        #[doc="Get the associated linker variable as a pointer"]
+        extern "C" {
+            static mut $linker_name: usize;
+        }
+        #[doc = "Get the associated linker variable as a pointer"]
         pub fn $rust_name() -> *mut usize {
             unsafe { addr_of_mut!($linker_name) }
         }
-    }
+    };
 }
 
 linker_var!(_trampoline_start, trampoline_start);

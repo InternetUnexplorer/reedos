@@ -8,6 +8,8 @@
 #![feature(strict_provenance)]
 #![feature(unsized_fn_params)]
 #![allow(dead_code)]
+
+use core::arch::asm;
 use core::panic::PanicInfo;
 extern crate alloc;
 
@@ -56,41 +58,38 @@ pub extern "C" fn _start() {
     // Set the *prior* privilege mode to supervisor.
     // Bits 12, 11 are for MPP. They are WPRI.
     // For sstatus we can write SPP reg, bit 8.
-    let mut ms = read_mstatus();
-    ms &= !MSTATUS_MPP_MASK;
-    ms |= MSTATUS_MPP_S;
-    write_mstatus(ms);
+    set_mstatus(get_mstatus() & !MSTATUS_MPP_MASK | MSTATUS_MPP_S);
 
     // Set machine exception prog counter to
     // our main function for later mret call.
-    write_mepc(fn_main);
+    set_mepc(fn_main as usize);
 
     // Disable paging while setting up.
-    write_satp(0);
+    set_satp(0);
 
     // Delegate trap handlers to kernel in supervisor mode.
     // Write 1's to all bits of register and read back reg
     // to see which positions hold a 1.
-    write_medeleg(0xffff);
-    write_mideleg(0xffff);
+    set_medeleg(0xffff);
+    set_mideleg(0xffff);
     //Supervisor interrupt enable.
-    let sie = read_sie() | SIE_SEIE | SIE_STIE | SIE_SSIE;
-    write_sie(sie);
+    set_sie(get_sie() | SIE_SEIE | SIE_STIE | SIE_SSIE);
 
     // Now give sup mode access to phys mem.
     // Check 3.7.1 of riscv priv isa manual.
-    write_pmpaddr0(0x3fffffffffffff_u64); // RTFM
-    write_pmpcfg0(0xf); // 1st 8 bits are pmp0cfg
+    set_pmpaddr0(0x3fffffffffffff_usize); // RTFM
+    set_pmpcfg0(0xf); // 1st 8 bits are pmp0cfg
 
     // Store each hart's hartid in its tp reg for identification.
-    let hartid = read_mhartid();
-    write_tp(hartid);
+    set_tp(get_mhartid());
 
     // Get interrupts from clock and set mtev handler fn.
     hw::timerinit();
 
     // Now return to sup mode and jump to main().
-    call_mret();
+    unsafe {
+        asm!("mret");
+    }
 }
 
 // Primary kernel bootstrap function.
@@ -98,7 +97,7 @@ pub extern "C" fn _start() {
 // one time by only doing so on hart0.
 fn main() -> ! {
     // We only bootstrap on hart0.
-    let id = read_tp();
+    let id = get_tp();
     if id == 0 {
         uart::Uart::init();
         println!("{}", param::BANNER);

@@ -3,8 +3,8 @@ pub mod param;
 pub mod riscv;
 
 use crate::device::clint;
-use crate::trap;
 use crate::process::Process;
+use crate::trap;
 use riscv::*;
 
 /// Callee saved registers.
@@ -28,14 +28,12 @@ pub fn timerinit() {
 
     // Set the machine trap vector to hold fn ptr to timervec.
     let timervec_fn = trap::__mtrapvec;
-    write_mtvec(timervec_fn as usize);
+    set_mtvec(timervec_fn as usize);
 
     // Enable machine mode interrupts with mstatus reg.
-    let mut mstatus = read_mstatus();
-    mstatus |= MSTATUS_MIE;
-    write_mstatus(mstatus);
+    set_mstatus(get_mstatus() | MSTATUS_MIE);
 
     // Enable machine-mode timer interrupts.
-    let mie = read_mie() | MIE_MTIE;
-    write_mie(mie);
+    let mie = get_mie() | MIE_MTIE;
+    set_mie(mie);
 }

@@ -48,9 +48,9 @@ pub struct ELFHeader {
     pub magic: [u8; 4],
     pub width: AddrWidth,
     pub endian: Endianness,
-    pub header_version: u8,                // ELF header version / calling convetion
+    pub header_version: u8, // ELF header version / calling convetion
     pub padding: [u8; 8],
-    pub ident_size: u8,             // possibly unused
+    pub ident_size: u8, // possibly unused
     // end of identifying info
     pub elf_type: ELFType,
     pub instruction_set: Architecture,
@@ -58,7 +58,7 @@ pub struct ELFHeader {
     pub entry: usize,
     pub program_header_pos: usize,
     pub section_header_pos: usize,
-    pub flags: u32,                 // architecture dependent
+    pub flags: u32, // architecture dependent
     pub header_size: u16,
     pub program_entry_size: u16,
     pub num_program_entries: u16,
@@ -96,13 +96,13 @@ pub const PROG_SEG_READ: u16 = 4;
 #[derive(Copy, Clone)]
 pub struct ProgramHeaderSegment64 {
     pub seg_type: ProgramSegmentType,
-    pub flags: u16,                 // OR of PROG_SEG_*
+    pub flags: u16, // OR of PROG_SEG_*
     pub file_offset: u64,
     pub vmem_addr: u64,
-    pub unused: u64,                // for System V ABI anyway, would be phys addr
+    pub unused: u64, // for System V ABI anyway, would be phys addr
     pub size_in_file: u64,
     pub size_in_memory: u64,
-    pub alignment: u64,              // is a power of two
+    pub alignment: u64, // is a power of two
 }
 
 // TODO sections are not implemented currently, as we are interested
@@ -150,12 +150,12 @@ pub struct ELFProgram {
 macro_rules! ill_formed {
     () => {
         panic!("ELF is ill-formed.")
-    }
+    };
 }
 macro_rules! unsupported {
     () => {
         panic!("ELF is unsupported.")
-    }
+    };
 }
 
 #[non_exhaustive]
@@ -180,30 +180,47 @@ impl ELFProgram {
             ill_formed!();
         }
         // filter out illformed or unsupported ELFs
-        match out.header.endian as u8 { // little only
-            1 => {},
-            2 => {unsupported!()}
-            _ => {ill_formed!()},
+        match out.header.endian as u8 {
+            // little only
+            1 => {}
+            2 => {
+                unsupported!()
+            }
+            _ => {
+                ill_formed!()
+            }
         };
-        match out.header.width as u8 { // 64 bit only
-            1 => {unsupported!()},
-            2 => {},
-            _ => {ill_formed!()},
+        match out.header.width as u8 {
+            // 64 bit only
+            1 => {
+                unsupported!()
+            }
+            2 => {}
+            _ => {
+                ill_formed!()
+            }
         };
-        match out.header.elf_type as u8 { // executable only
-            2 => {},
-            1 | 3..=4 => {unsupported!()},
-            _ => {ill_formed!()},
+        match out.header.elf_type as u8 {
+            // executable only
+            2 => {}
+            1 | 3..=4 => {
+                unsupported!()
+            }
+            _ => {
+                ill_formed!()
+            }
         };
-        match out.header.instruction_set as u8 { // riscv only
-            0 | 2 | 3 | 8 |
-            0x14 | 0x28 | 0x2A | 0x32 |
-            0x3E | 0xB7 => {unsupported!()},
-            0xF3 => {},
-            _ => {ill_formed!()},
+        match out.header.instruction_set as u8 {
+            // riscv only
+            0 | 2 | 3 | 8 | 0x14 | 0x28 | 0x2A | 0x32 | 0x3E | 0xB7 => {
+                unsupported!()
+            }
+            0xF3 => {}
+            _ => {
+                ill_formed!()
+            }
         };
         // todo? Test header_version and version. header flags maybe?
         out
     }
-
 }

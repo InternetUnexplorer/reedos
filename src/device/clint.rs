@@ -18,7 +18,7 @@ pub fn read_mtime() -> u64 {
 // mtimecmp reg is at base + 0x4000
 // mtime reg is base + 0xbff8
 pub fn set_mtimecmp(interval: u64) {
-    let hartid = riscv::read_mhartid() as usize;
+    let hartid = riscv::get_mhartid() as usize;
     let base = param::CLINT_BASE as *mut usize;
     unsafe {
         // One mtime register for all cores.
