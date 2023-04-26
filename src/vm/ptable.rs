@@ -79,7 +79,7 @@ fn phy_to_pte(ptr: PhysAddress) -> PTEntry {
 #[inline(always)]
 fn phy_to_satp(ptr: PhysAddress) -> usize {
     if cfg!(target_pointer_width = "32") {
-        (1 << 31) | (ptr.addr() / PAGE_SIZE) // Sv39
+        (1 << 31) | (ptr.addr() / PAGE_SIZE) // Sv32
     } else {
         (8 << 60) | (ptr.addr() / PAGE_SIZE) // Sv39
     }
