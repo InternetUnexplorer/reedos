@@ -14,20 +14,22 @@
           inherit system;
           overlays = [ (import rust-overlay) ];
         };
+        riscv32-cc = pkgs.pkgsCross.riscv32-embedded.stdenv.cc;
         riscv64-cc = pkgs.pkgsCross.riscv64-embedded.stdenv.cc;
       in {
         devShells.default = pkgs.mkShell {
           buildInputs = with pkgs; [
             (rust-bin.nightly.latest.default.override {
               extensions = [ "rust-src" ];
-              targets = [ "riscv64imac-unknown-none-elf" ];
+              targets = [
+                "riscv32imac-unknown-none-elf"
+                "riscv64imac-unknown-none-elf"
+              ];
             })
+            riscv32-cc
             riscv64-cc
             qemu
           ];
-
-          RISCV64_AS = "${riscv64-cc}/bin/${riscv64-cc.targetPrefix}as";
-          RISCV64_LD = "${riscv64-cc}/bin/${riscv64-cc.targetPrefix}ld";
         };
       });
 }
