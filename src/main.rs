@@ -77,8 +77,12 @@ pub extern "C" fn _start() {
 
     // Now give sup mode access to phys mem.
     // Check 3.7.1 of riscv priv isa manual.
-    set_pmpaddr0(0x3fffffffffffff_usize); // RTFM
-    set_pmpcfg0(0xf); // 1st 8 bits are pmp0cfg
+    if cfg!(target_pointer_width = "32") {
+        set_pmpaddr0(((1u64 << 32) - 1) as usize);
+    } else {
+        set_pmpaddr0(((1u64 << 54) - 1) as usize);
+    }
+    set_pmpcfg0(0xf);
 
     // Store each hart's hartid in its tp reg for identification.
     set_tp(get_mhartid());

@@ -1,7 +1,7 @@
 //! Kernel trap handlers.
 use crate::device::clint;
-use crate::hw::riscv::{get_mcause, get_mhartid, get_scause};
-use crate::hw::{riscv, INTERVAL};
+use crate::hw::riscv;
+use crate::hw::riscv::{get_mcause, get_scause};
 use crate::vm::ptable::PageTable;
 
 use crate::log;
@@ -32,12 +32,12 @@ pub fn init() {
 #[no_mangle]
 pub extern "C" fn m_handler() {
     let cause = get_mcause();
-    let is_interrupt = (get_mcause() as isize) < 0;
+    const TIMER_INTERRUPT: usize = (isize::MIN | 7) as usize;
 
     match cause {
         // Machine timer interrupt
-        7 if is_interrupt => {
-            log::log!(Debug, "Machine timer interrupt, hart: {}", get_mhartid());
+        TIMER_INTERRUPT => {
+            // log::log!(Debug, "Machine timer interrupt, hart: {}", get_mhartid());
             clint::set_mtimecmp(10_000_000);
         }
         _ => {

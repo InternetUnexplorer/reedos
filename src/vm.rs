@@ -83,8 +83,8 @@ pub fn init() -> Result<(), PagePool> {
     // Map text, data, stacks, heap into kernel page table.
     match kpage_init() {
         Ok(pt) => pt.write_satp(),
-        Err(_) => {
-            panic!();
+        Err(e) => {
+            panic!("{e:?}");
         }
     }
     Ok(())

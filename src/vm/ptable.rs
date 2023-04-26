@@ -14,6 +14,11 @@ const PTE_SIZE: usize = 8;
 const NUM_PTES: usize = PAGE_SIZE / PTE_SIZE;
 
 #[cfg(target_pointer_width = "32")]
+const PT_LEVELS: u32 = 2;
+#[cfg(target_pointer_width = "64")]
+const PT_LEVELS: u32 = 3;
+
+#[cfg(target_pointer_width = "32")]
 const VA_MAX: usize = ((1u64 << 32) - 1) as usize; // Sv32
 #[cfg(target_pointer_width = "64")]
 const VA_MAX: usize = ((1u64 << 39) - 1) as usize; // Sv39
@@ -44,21 +49,6 @@ pub struct PageTable {
     base: PhysAddress, // Page Table located at base address.
 }
 
-#[inline(always)]
-fn vpn(ptr: VirtAddress, level: u32) -> usize {
-    ptr.addr() / PAGE_SIZE / NUM_PTES.pow(level) % NUM_PTES
-}
-
-#[inline(always)]
-fn pte_to_phy(pte: PTEntry) -> PhysAddress {
-    (pte / NUM_PTES * PAGE_SIZE) as *mut usize
-}
-
-#[inline(always)]
-fn phy_to_pte(ptr: PhysAddress) -> PTEntry {
-    ptr.addr() / PAGE_SIZE * NUM_PTES
-}
-
 macro_rules! pte_get_flag {
     ($pte:expr, $flag:expr) => {
         ($pte) & $flag != 0
@@ -72,11 +62,26 @@ macro_rules! pte_set_flag {
 }
 
 #[inline(always)]
+fn vpn(ptr: VirtAddress, level: u32) -> usize {
+    (ptr.addr() / PAGE_SIZE / NUM_PTES.pow(level)) % NUM_PTES
+}
+
+#[inline(always)]
+fn pte_to_phy(pte: PTEntry) -> PhysAddress {
+    ((pte >> 10) * PAGE_SIZE) as *mut usize
+}
+
+#[inline(always)]
+fn phy_to_pte(ptr: PhysAddress) -> PTEntry {
+    (ptr.addr() / PAGE_SIZE) << 10
+}
+
+#[inline(always)]
 fn phy_to_satp(ptr: PhysAddress) -> usize {
     if cfg!(target_pointer_width = "32") {
-        (1 << 31) | (ptr.addr() >> 12) // Sv39
+        (1 << 31) | (ptr.addr() / PAGE_SIZE) // Sv39
     } else {
-        (8 << 60) | (ptr.addr() >> 12) // Sv39
+        (8 << 60) | (ptr.addr() / PAGE_SIZE) // Sv39
     }
 }
 
@@ -86,9 +91,9 @@ macro_rules! page_align_down {
     };
 }
 
-// Read the memory at location self + index * 8 bytes
+// Read the memory at location self + index * PTE size
 unsafe fn get_phy_offset(phy: PhysAddress, index: usize) -> *mut PTEntry {
-    phy.byte_add(index * 8)
+    phy.byte_add(index * PTE_SIZE)
 }
 
 fn set_pte(pte: *mut PTEntry, contents: PTEntry) {
@@ -127,7 +132,7 @@ impl PageTable {
 unsafe fn walk(pt: PageTable, va: VirtAddress, alloc_new: bool) -> Result<*mut PTEntry, VmError> {
     let mut table = pt;
     assert!(va.addr() <= VA_MAX);
-    for level in (1..3).rev() {
+    for level in (1..PT_LEVELS).rev() {
         let idx = vpn(va, level);
         let next: *mut PTEntry = table.index_mut(idx);
         table = match pte_get_flag!(*next, PTE_VALID) {

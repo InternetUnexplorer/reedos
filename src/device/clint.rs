@@ -25,6 +25,6 @@ pub fn set_mtimecmp(interval: usize) {
         let mtime = base.byte_add(0xBFF8).read_volatile();
         // mtimecmp register per core.
         base.byte_add(0x4000 + 8 * hartid)
-            .write_volatile(mtime + interval as usize);
+            .write_volatile(mtime + interval);
     }
 }
