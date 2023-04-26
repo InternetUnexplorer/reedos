@@ -55,10 +55,9 @@ pub extern "C" fn _start() {
     // xv6-riscv/kernel/start.c
     let fn_main = main as *const ();
 
-    // Set the *prior* privilege mode to supervisor.
-    // Bits 12, 11 are for MPP. They are WPRI.
-    // For sstatus we can write SPP reg, bit 8.
-    set_mstatus(get_mstatus() & !MSTATUS_MPP_MASK | MSTATUS_MPP_S);
+    // Set the *prior* privilege mode to supervisor (01).
+    // mstatus[12:11] = MPP
+    set_mstatus(get_mstatus() & !(1 << 12) | (1 << 11));
 
     // Set machine exception prog counter to
     // our main function for later mret call.
@@ -72,8 +71,9 @@ pub extern "C" fn _start() {
     // to see which positions hold a 1.
     set_medeleg(0xffff);
     set_mideleg(0xffff);
-    //Supervisor interrupt enable.
-    set_sie(get_sie() | SIE_SEIE | SIE_STIE | SIE_SSIE);
+
+    // Supervisor interrupt enable (sie SEIE, STIE, SSIE).
+    set_sie(get_sie() | (1 << 9) | (1 << 5) | (1 << 1));
 
     // Now give sup mode access to phys mem.
     // Check 3.7.1 of riscv priv isa manual.

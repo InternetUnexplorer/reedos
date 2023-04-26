@@ -2,30 +2,6 @@
 use core::arch::asm;
 use paste::paste;
 
-/// Machine previous protection mode.
-pub const MSTATUS_MPP_MASK: usize = 3 << 11; // Mask for bit tricks
-pub const MSTATUS_MPP_M: usize = 3 << 11; // Machine
-pub const MSTATUS_MPP_S: usize = 1 << 11; // Supervisor
-pub const MSTATUS_MPP_U: usize = 0 << 11; // User
-pub const MSTATUS_MIE: usize = 1 << 3; // machine-mode interrupt enable.
-pub const MSTATUS_TIMER: usize = (1 << 63) | (7); // mcause for machine mode timer.
-                                                  // sstatus := Supervisor status reg.
-pub const SSTATUS_SPP: usize = 1 << 8; // Previous mode, 1=Supervisor, 0=User
-pub const SSTATUS_SPIE: usize = 1 << 5; // Supervisor Previous Interrupt Enable
-pub const SSTATUS_UPIE: usize = 1 << 4; // User Previous Interrupt Enable
-pub const SSTATUS_SIE: usize = 1 << 1; // Supervisor Interrupt Enable
-pub const SSTATUS_UIE: usize = 1 << 0; // User Interrupt Enable
-
-/// Machine-mode Interrupt Enable
-pub const MIE_MEIE: usize = 1 << 11; // external
-pub const MIE_MTIE: usize = 1 << 7; // timer
-pub const MIE_MSIE: usize = 1 << 3; // software
-
-/// Supervisor Interrupt Enable
-pub const SIE_SEIE: usize = 1 << 9; // external
-pub const SIE_STIE: usize = 1 << 5; // timer
-pub const SIE_SSIE: usize = 1 << 1; // software
-
 // TODO: Do we really need .option norvc?
 
 macro_rules! csr_getter {
@@ -73,6 +49,8 @@ macro_rules! csr_getter_setter {
 
 csr_getter!(mhartid, id, "ID of current hart (M mode)");
 csr_getter_setter!(mstatus, status, "status register (M mode)");
+#[cfg(target_pointer_width = "32")]
+csr_getter_setter!(mstatush, status, "additional status register (M mode)");
 csr_getter_setter!(sstatus, status, "status register (S mode)");
 csr_getter!(mcause, cause, "trap cause register (M mode)");
 csr_getter!(scause, cause, "trap cause register (S mode)");

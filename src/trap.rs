@@ -1,6 +1,7 @@
 //! Kernel trap handlers.
 use crate::device::clint;
-use crate::hw::riscv;
+use crate::hw::riscv::{get_mcause, get_mhartid, get_scause};
+use crate::hw::{riscv, INTERVAL};
 use crate::vm::ptable::PageTable;
 
 use crate::log;
@@ -30,18 +31,20 @@ pub fn init() {
 /// Machine mode trap handler.
 #[no_mangle]
 pub extern "C" fn m_handler() {
-    let mcause = riscv::get_mcause();
+    let cause = get_mcause();
+    let is_interrupt = (get_mcause() as isize) < 0;
 
-    match mcause {
-        riscv::MSTATUS_TIMER => {
-            // log::log!(Debug, "Machine timer interupt, hart: {}", riscv::read_mhartid());
+    match cause {
+        // Machine timer interrupt
+        7 if is_interrupt => {
+            log::log!(Debug, "Machine timer interrupt, hart: {}", get_mhartid());
             clint::set_mtimecmp(10_000_000);
         }
         _ => {
             log::log!(
                 Warning,
-                "Uncaught machine mode interupt. mcause: 0x{:x}",
-                mcause
+                "Uncaught machine mode interrupt. mcause: 0x{:x}",
+                cause
             );
             panic!();
         }
@@ -51,7 +54,7 @@ pub extern "C" fn m_handler() {
 /// Supervisor mode trap handler.
 #[no_mangle]
 pub extern "C" fn s_handler() {
-    let cause = riscv::get_scause();
+    let cause = get_scause();
 
     {
         log::log!(

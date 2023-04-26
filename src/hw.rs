@@ -7,6 +7,8 @@ use crate::process::Process;
 use crate::trap;
 use riscv::*;
 
+pub const INTERVAL: usize = 10_000_000;
+
 /// Callee saved registers.
 pub struct HartContext {
     regs: [usize; 32],
@@ -23,17 +25,13 @@ pub struct Hart {
 /// We write the machine mode trap vector register (mtvec) with the address
 /// of our `src/asm` trap handler function.
 pub fn timerinit() {
-    let interval = 10_000_000; // May want to speed this up in the future.
-    clint::set_mtimecmp(interval);
+    clint::set_mtimecmp(INTERVAL);
 
     // Set the machine trap vector to hold fn ptr to timervec.
-    let timervec_fn = trap::__mtrapvec;
-    set_mtvec(timervec_fn as usize);
+    set_mtvec(trap::__mtrapvec as usize);
 
-    // Enable machine mode interrupts with mstatus reg.
-    set_mstatus(get_mstatus() | MSTATUS_MIE);
-
-    // Enable machine-mode timer interrupts.
-    let mie = get_mie() | MIE_MTIE;
-    set_mie(mie);
+    // Enable machine mode interrupts (mstatus MIE).
+    set_mstatus(get_mstatus() | (1 << 3));
+    // Enable machine-mode timer interrupts (mie MTIE).
+    set_mie(get_mie() | (1 << 7));
 }
