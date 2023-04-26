@@ -6,8 +6,18 @@ use crate::hw::riscv::*;
 use crate::vm::*;
 use core::assert;
 
-const VA_TOP: usize = 1 << (27 + 12); // 2^27 VPN + 12 Offset
-const PTE_TOP: usize = 512; // 4Kb / 8 byte PTEs = 512 PTEs / page!
+const PAGE_SIZE: usize = 4096;
+#[cfg(target_pointer_width = "32")]
+const PTE_SIZE: usize = 4;
+#[cfg(target_pointer_width = "64")]
+const PTE_SIZE: usize = 8;
+const NUM_PTES: usize = PAGE_SIZE / PTE_SIZE;
+
+#[cfg(target_pointer_width = "32")]
+const VA_MAX: usize = ((1u64 << 32) - 1) as usize; // Sv32
+#[cfg(target_pointer_width = "64")]
+const VA_MAX: usize = ((1u64 << 39) - 1) as usize; // Sv39
+
 const PTE_VALID: usize = 1 << 0;
 const PTE_READ: usize = 1 << 1;
 const PTE_WRITE: usize = 1 << 2;
@@ -35,27 +45,27 @@ pub struct PageTable {
 }
 
 #[inline(always)]
-fn vpn(ptr: VirtAddress, level: usize) -> usize {
-    ptr.addr() >> (12 + 9 * level) & 0x1FF
+fn vpn(ptr: VirtAddress, level: u32) -> usize {
+    ptr.addr() / PAGE_SIZE / NUM_PTES.pow(level) % NUM_PTES
 }
 
 #[inline(always)]
 fn pte_to_phy(pte: PTEntry) -> PhysAddress {
-    ((pte >> 10) << 12) as *mut usize
+    (pte / NUM_PTES * PAGE_SIZE) as *mut usize
 }
 
 #[inline(always)]
 fn phy_to_pte(ptr: PhysAddress) -> PTEntry {
-    ((ptr.addr()) >> 12) << 10
+    ptr.addr() / PAGE_SIZE * NUM_PTES
 }
 
-macro_rules! PteGetFlag {
+macro_rules! pte_get_flag {
     ($pte:expr, $flag:expr) => {
         ($pte) & $flag != 0
     };
 }
 
-macro_rules! PteSetFlag {
+macro_rules! pte_set_flag {
     ($pte:expr, $flag:expr) => {
         (($pte) | $flag)
     };
@@ -63,10 +73,14 @@ macro_rules! PteSetFlag {
 
 #[inline(always)]
 fn phy_to_satp(ptr: PhysAddress) -> usize {
-    (1 << 63) | (ptr.addr() >> 12)
+    if cfg!(target_pointer_width = "32") {
+        (1 << 31) | (ptr.addr() >> 12) // Sv39
+    } else {
+        (8 << 60) | (ptr.addr() >> 12) // Sv39
+    }
 }
 
-macro_rules! PageAlignDown {
+macro_rules! page_align_down {
     ($p:expr) => {
         ($p).map_addr(|addr| addr & !(PAGE_SIZE - 1))
     };
@@ -97,7 +111,7 @@ impl From<PTEntry> for PageTable {
 
 impl PageTable {
     fn index_mut(&self, idx: usize) -> *mut PTEntry {
-        assert!(idx < PTE_TOP);
+        assert!(idx < NUM_PTES);
         unsafe { get_phy_offset(self.base, idx) }
     }
     pub fn write_satp(&self) {
@@ -112,17 +126,17 @@ impl PageTable {
 // or allocate a new page.
 unsafe fn walk(pt: PageTable, va: VirtAddress, alloc_new: bool) -> Result<*mut PTEntry, VmError> {
     let mut table = pt;
-    assert!(va.addr() < VA_TOP);
+    assert!(va.addr() <= VA_MAX);
     for level in (1..3).rev() {
         let idx = vpn(va, level);
         let next: *mut PTEntry = table.index_mut(idx);
-        table = match PteGetFlag!(*next, PTE_VALID) {
+        table = match pte_get_flag!(*next, PTE_VALID) {
             true => PageTable::from(*next),
             false => {
                 if alloc_new {
                     match PAGEPOOL.get_mut().unwrap().palloc() {
                         Ok(pg) => {
-                            *next = PteSetFlag!(phy_to_pte(pg.addr), PTE_VALID);
+                            *next = pte_set_flag!(phy_to_pte(pg.addr), PTE_VALID);
                             PageTable::from(phy_to_pte(pg.addr))
                         }
                         Err(e) => return Err(e),
@@ -157,9 +171,9 @@ pub fn page_map(
     flag: usize,
 ) -> Result<(), VmError> {
     // Round down to page aligned boundary (multiple of pg size).
-    let mut start = PageAlignDown!(va);
+    let mut start = page_align_down!(va);
     let mut phys = pa;
-    let end = PageAlignDown!(va.map_addr(|addr| addr + (size - 1)));
+    let end = page_align_down!(va.map_addr(|addr| addr + (size - 1)));
 
     while start <= end {
         let walk_addr = unsafe { walk(pt, start, true) };
@@ -171,7 +185,7 @@ pub fn page_map(
                 if read_pte(pte_addr) & PTE_VALID != 0 {
                     return Err(VmError::PallocFail);
                 }
-                set_pte(pte_addr, PteSetFlag!(phy_to_pte(phys), flag | PTE_VALID));
+                set_pte(pte_addr, pte_set_flag!(phy_to_pte(phys), flag | PTE_VALID));
                 start = start.map_addr(|addr| addr + PAGE_SIZE);
                 phys = phys.map_addr(|addr| addr + PAGE_SIZE);
             }
