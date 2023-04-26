@@ -53,7 +53,6 @@ pub enum VmError {
     Koom,
 }
 
-
 /// Initialize the kernel VM system.
 /// First, setup the kernel physical page pool.
 /// We start the pool at the end of the .bss section, and stop at the end of physical memory.
@@ -63,7 +62,7 @@ pub enum VmError {
 /// kernel's page table struct.
 pub fn init() -> Result<(), PagePool> {
     unsafe {
-        match PAGEPOOL.set(PagePool::new(bss_end(), dram_end())) {
+        match PAGEPOOL.set(PagePool::new(bss_end(), memory_end())) {
             Ok(_) => {}
             Err(_) => {
                 panic!("vm double init.")
@@ -128,7 +127,6 @@ pub unsafe fn test_galloc() {
 
 // -------------------------------------------------------------------
 
-
 // /// See `vm::vmalloc::Kalloc::alloc`.
 // pub fn kalloc(size: usize) -> Result<*mut usize, vmalloc::KallocError> {
 //     unsafe { VMALLOC.get_mut().unwrap().alloc(size) }
@@ -148,7 +146,6 @@ fn pfree(page: Page) -> Result<(), VmError> {
     unsafe { PAGEPOOL.get_mut().unwrap().pfree(page) }
 }
 
-
 // -------------------------------------------------------------------
 
 /// Out facing interface for physical pages. Automatically cleaned up
@@ -164,19 +161,22 @@ impl PhysPageExtent {
     }
 
     pub fn end(&self) -> *mut usize {
-        unsafe {
-            self.head.addr.byte_add(self.num * PAGE_SIZE)
-        }
+        unsafe { self.head.addr.byte_add(self.num * PAGE_SIZE) }
     }
 }
 
 impl Drop for PhysPageExtent {
     fn drop(&mut self) {
         unsafe {
-            match PAGEPOOL.get_mut().unwrap()
-                .pfree_plural(self.head.addr, self.num) {
-                    Ok(_) => {},
-                    Err(e) => {panic!("Double palloc free! {:?}", e)}
+            match PAGEPOOL
+                .get_mut()
+                .unwrap()
+                .pfree_plural(self.head.addr, self.num)
+            {
+                Ok(_) => {}
+                Err(e) => {
+                    panic!("Double palloc free! {:?}", e)
+                }
             }
         }
     }
@@ -185,10 +185,8 @@ impl Drop for PhysPageExtent {
 unsafe impl Send for PhysPageExtent {}
 
 /// Should be one and only way to get physical pages outside of vm module/subsystem.
-pub fn request_phys_page(num: usize) -> Result<PhysPageExtent, VmError>{
-    let addr = unsafe {
-        PAGEPOOL.get_mut().unwrap().palloc_plural(num)?
-    };
+pub fn request_phys_page(num: usize) -> Result<PhysPageExtent, VmError> {
+    let addr = unsafe { PAGEPOOL.get_mut().unwrap().palloc_plural(num)? };
     Ok(PhysPageExtent {
         head: Page::from(addr),
         num,

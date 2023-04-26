@@ -6,7 +6,6 @@
 #![feature(sync_unsafe_cell)]
 #![feature(panic_info_message)]
 #![feature(strict_provenance)]
-#![feature(once_cell)]
 #![feature(unsized_fn_params)]
 #![allow(dead_code)]
 use core::panic::PanicInfo;
@@ -16,12 +15,12 @@ extern crate alloc;
 pub mod log;
 pub mod asm;
 pub mod device;
+pub mod file;
 pub mod hw;
 pub mod lock;
+pub mod process;
 pub mod trap;
 pub mod vm;
-pub mod process;
-pub mod file;
 
 use crate::device::uart;
 use crate::hw::param;
@@ -116,7 +115,10 @@ fn main() -> ! {
         }
         log!(Debug, "Testing phys page extent allocation and freeing...");
         vm::test_phys_page();
-        log!(Debug, "Successful phys page extent allocation and freeing...");
+        log!(
+            Debug,
+            "Successful phys page extent allocation and freeing..."
+        );
         log!(Info, "Completed all hart0 initialization and testing...");
     } else {
         //Interrupt other harts to init kpgtable.

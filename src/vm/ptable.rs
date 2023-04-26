@@ -141,10 +141,10 @@ unsafe fn walk(pt: PageTable, va: VirtAddress, alloc_new: bool) -> Result<*mut P
 
 /// Helper for making flags for page_map for unpriviledged processes
 pub fn user_process_flags(r: bool, w: bool, e: bool) -> usize {
-    PTE_USER |
-    if r {PTE_READ} else {0} |
-    if w {PTE_WRITE} else {0} |
-    if e {PTE_EXEC} else {0}
+    PTE_USER
+        | if r { PTE_READ } else { 0 }
+        | if w { PTE_WRITE } else { 0 }
+        | if e { PTE_EXEC } else { 0 }
 }
 
 /// Maps some number of pages into the VM given by pt of byte length
@@ -307,7 +307,7 @@ pub fn kpage_init() -> Result<PageTable, VmError> {
         kpage_table,
         bss_end(),
         bss_end(),
-        dram_end().addr() - bss_end().addr(),
+        memory_end().addr() - bss_end().addr(),
         PTE_READ | PTE_WRITE,
     )?;
     log!(Debug, "Succesfully mapped kernel heap...");
